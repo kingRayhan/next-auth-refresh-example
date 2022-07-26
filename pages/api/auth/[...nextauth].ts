@@ -1,7 +1,6 @@
 import axios from "axios";
 import NextAuth, { NextAuthOptions, Session } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import jwt from "jsonwebtoken";
 // import AppleProvider from "next-auth/providers/apple"
 // import EmailProvider from "next-auth/providers/email"
 
@@ -9,6 +8,7 @@ import jwt from "jsonwebtoken";
 // https://next-auth.js.org/configuration/options
 export const authOptions: NextAuthOptions = {
   debug: true,
+  secret: "supersecretkeyyoushouldnotcommittogithub",
   // https://next-auth.js.org/configuration/providers/oauth
   providers: [
     CredentialsProvider({
@@ -35,13 +35,13 @@ export const authOptions: NextAuthOptions = {
         // e.g. return { id: 1, name: 'J Smith', email: 'jsmith@example.com' }
         // You can also use the `req` object to obtain additional parameters
         // (i.e., the request IP address)
-        console.log("=========================");
-        console.log(credentials);
-        console.log("=========================");
         try {
           const {
             data: { token },
-          } = await axios.post("http://localhost:7550/auth/login", credentials);
+          } = await axios.post(
+            "https://dummy-jwt-refresh-token-api.vercel.app/auth/login",
+            credentials
+          );
 
           return token;
         } catch (error) {
@@ -55,18 +55,9 @@ export const authOptions: NextAuthOptions = {
   },
   jwt: {
     encode({ token }) {
-      console.log("===========");
-      console.log("jwt encode");
-      console.log(token);
-      console.log("===========");
-
       return Promise.resolve(JSON.stringify(token));
     },
-    decode({ token, secret }) {
-      console.log("========");
-      console.log("jwt decode");
-      console.log(token);
-      console.log("=========");
+    decode({ token }) {
       return new Promise((resolve, reject) => {
         resolve(token ? JSON.parse(token) : null);
       });
@@ -74,27 +65,54 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      console.log("===========");
-      console.log("callback jwt");
-      console.log(token, user);
-      console.log("============");
       return user?.accessToken ? user : token;
     },
     async session({ session, token, user }) {
-      console.log("===================================");
-      console.log("session");
-      console.log(JSON.stringify({ user, token, session }, null, 2));
-      console.log("=================================");
-      const { data } = await axios.get("http://localhost:7550/auth/me", {
-        headers: { Authorization: `Bearer ${token?.accessToken}` },
-      });
-      const sess: Session = {
-        ...session,
-        user: data?.data,
-      };
-      console.log(JSON.stringify(sess));
-      console.log("========= the end ============");
-      return sess;
+      console.log("session/token", { ...token });
+      console.log("session/session", { ...session });
+      try {
+        const { data } = await axios.get(
+          "https://dummy-jwt-refresh-token-api.vercel.app/auth/me",
+          {
+            headers: { Authorization: `Bearer ${token?.accessToken}` },
+          }
+        );
+
+        const _session: Session = {
+          ...session,
+          user: data?.data,
+        };
+        return _session;
+      } catch (error) {
+        console.log("Access token expired. Refreshing...");
+        const { data: _refreshed } = await axios.post(
+          "https://dummy-jwt-refresh-token-api.vercel.app/auth/refresh",
+          {},
+          {
+            headers: { Authorization: `Bearer ${token?.refreshToken}` },
+          }
+        );
+
+        const { data: _refreshedUser } = await axios.get(
+          "https://dummy-jwt-refresh-token-api.vercel.app/auth/me",
+          {
+            headers: {
+              Authorization: `Bearer ${_refreshed.token.accessToken}`,
+            },
+          }
+        );
+
+        console.log("Refreshed user", _refreshedUser);
+
+        const _session: Session = {
+          ...session,
+          // accessToken: _refreshed.accessToken,
+          // refreshToken: _refreshed.refreshToken,
+          user: _refreshedUser?.data,
+        };
+
+        return _session;
+      }
     },
   },
 };
