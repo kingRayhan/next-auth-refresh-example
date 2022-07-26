@@ -59,12 +59,14 @@ export const authOptions: NextAuthOptions = {
     },
     decode({ token }) {
       return new Promise((resolve, reject) => {
+        console.log("decode/token", { token });
         resolve(token ? JSON.parse(token) : null);
       });
     },
   },
   callbacks: {
     async jwt({ token, user }) {
+      console.log("callbacks/jwt", { token, user });
       return user?.accessToken ? user : token;
     },
     async session({ session, token, user }) {
@@ -106,8 +108,10 @@ export const authOptions: NextAuthOptions = {
 
         const _session: Session = {
           ...session,
-          // accessToken: _refreshed.accessToken,
-          // refreshToken: _refreshed.refreshToken,
+          // token: {
+          //   accessToken: _refreshed.accessToken,
+          //   refreshToken: _refreshed.refreshToken,
+          // },
           user: _refreshedUser?.data,
         };
 
