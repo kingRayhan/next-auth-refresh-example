@@ -35,6 +35,9 @@ export const authOptions: NextAuthOptions = {
         // e.g. return { id: 1, name: 'J Smith', email: 'jsmith@example.com' }
         // You can also use the `req` object to obtain additional parameters
         // (i.e., the request IP address)
+        console.log("=========================");
+        console.log(credentials);
+        console.log("=========================");
         try {
           const {
             data: { token },
@@ -57,30 +60,15 @@ export const authOptions: NextAuthOptions = {
       console.log(token);
       console.log("===========");
 
-      return Promise.resolve(token);
+      return Promise.resolve(JSON.stringify(token));
     },
-    decode({ token }) {
+    decode({ token, secret }) {
       console.log("========");
       console.log("jwt decode");
       console.log(token);
       console.log("=========");
       return new Promise((resolve, reject) => {
-        jwt.verify(
-          token?.accessToken as string,
-          "L8oNQF0pYMXzA20JNYwRmR2RB0BohKgY",
-          (err, decoded) => {
-            if (decoded) {
-              const user = {
-                _id: decoded._id,
-                name: decoded.name,
-                email: decoded.email,
-                avatar: decoded?.avatar,
-              };
-              return resolve(decoded);
-            }
-            return resolve(null);
-          }
-        );
+        resolve(token ? JSON.parse(token) : null);
       });
     },
   },
@@ -97,21 +85,15 @@ export const authOptions: NextAuthOptions = {
       console.log("session");
       console.log(JSON.stringify({ user, token, session }, null, 2));
       console.log("=================================");
-      const {
-        data: { user: me },
-      } = await axios.get("http://localhost:7550/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
+      const { data } = await axios.get("http://localhost:7550/auth/me", {
+        headers: { Authorization: `Bearer ${token?.accessToken}` },
       });
       const sess: Session = {
         ...session,
-        user: {
-          ...me,
-
-          // admin: true,
-          // age: 43,
-        },
+        user: data?.data,
       };
-
+      console.log(JSON.stringify(sess));
+      console.log("========= the end ============");
       return sess;
     },
   },
